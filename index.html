@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LM - Assistente</title>
+  <title>REALIZZE - Assistente</title>
   <style>
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; background: #f3f4f6; color: #111827; }
     header { background: #1f2937; color: #fff; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; }
@@ -37,7 +37,7 @@
 <body>
 
 <header>
-  <div><strong>LM - Assistente</strong></div>
+  <div><strong>REALIZZE - Assistente</strong></div>
   <div><strong>LUCAS MELLOS</strong> (51)980477828</div>
 </header>
 
@@ -58,7 +58,7 @@
       <input type="file" id="importar" hidden accept=".json" />
       <button class="sec" onclick="document.getElementById('importar').click()">Importar JSON</button>
       <div id="statusCadastro" class="status">Sistema pronto.</div>
-      <div class="muted" style="margin-top:8px;">Agora a LM entende perguntas parecidas melhor, usa sinônimos e pode sugerir a resposta mais próxima quando a semelhança não for exata.</div>
+      <div class="muted" style="margin-top:8px;">Agora a REALIZZE entende perguntas parecidas melhor, usa sinônimos e pode sugerir a resposta mais próxima quando a semelhança não for exata.</div>
     </div>
 
     <div class="card">
@@ -69,7 +69,7 @@
 
   <div id="assistente" class="tab-content">
     <div class="card">
-      <h3>Pergunte para LM</h3>
+      <h3>Pergunte para REALIZZE</h3>
       <input id="perguntaUser" placeholder="Toque aqui e use o microfone do teclado" />
       <button onclick="perguntarLM()">Perguntar</button>
       <button class="sec" onclick="ativarModoVoz()">Iniciar escuta automática</button>
@@ -93,7 +93,7 @@
 </main>
 
 <script>
-  const STORAGE_KEY = 'lm_perguntas_respostas_v4';
+  const STORAGE_KEY = 'realizze_perguntas_respostas_v4';
   let base = [];
   let editandoIndex = -1;
   let recognition = null;
@@ -486,8 +486,8 @@
     modoGravacao = false;
     etapaGravacao = 'esperando';
     perguntaTemporaria = '';
-    document.getElementById('respostaLM').innerText = 'LM ouvindo. Diga uma pergunta ou diga GRAVAR para cadastrar por voz.';
-    ouvirTexto('LM ouvindo. Diga uma pergunta ou diga gravar para cadastrar por voz.');
+    document.getElementById('respostaLM').innerText = 'REALIZZE ativa. Faça uma pergunta ou diga GRAVAR para cadastrar por voz.';
+    ouvirTexto('REALIZZE ativa. Faça uma pergunta ou diga gravar para cadastrar por voz.');
     iniciarEscutaContinua();
   }
 
