@@ -7,8 +7,8 @@
   <style>
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; background: #f3f4f6; color: #111827; }
     header { background: #1f2937; color: #fff; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; }
-    main { padding: 14px; }
-    .tabs { display: flex; gap: 10px; margin-bottom: 12px; }
+    main { padding: 14px; max-width: 1100px; margin: 0 auto; }
+    .tabs { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
     .tab-btn { padding: 10px 14px; border: none; background: #d1d5db; cursor: pointer; border-radius: 6px; font-weight: bold; }
     .tab-btn.active { background: #1f2937; color: #fff; }
     .tab-content { display: none; }
@@ -17,16 +17,20 @@
     textarea { min-height: 90px; resize: vertical; }
     button { padding: 10px 14px; margin-right: 6px; margin-bottom: 6px; cursor: pointer; border: none; border-radius: 6px; background: #1f2937; color: white; }
     button.sec { background: #6b7280; }
+    button.ok { background: #166534; }
     .card { background: #fff; padding: 14px; margin-bottom: 12px; border-radius: 10px; border: 1px solid #cbd5e1; }
     .qa-item { border: 1px solid #d1d5db; padding: 12px; border-radius: 8px; margin-bottom: 10px; background: #f9fafb; }
     .qa-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
     .qa-actions button { padding: 7px 10px; font-size: 13px; }
     .muted { color: #6b7280; font-size: 13px; }
     .status { padding: 10px 12px; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; margin-top: 10px; }
-    .resposta-box { min-height: 100px; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb; }
+    .resposta-box { min-height: 100px; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb; line-height: 1.5; }
+    .score-box { margin-top: 10px; padding: 10px 12px; background: #f8fafc; border: 1px solid #dbeafe; border-radius: 8px; }
+    .pill { display: inline-block; background: #e5e7eb; color: #111827; padding: 4px 8px; border-radius: 999px; font-size: 12px; margin-right: 6px; margin-bottom: 6px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 700px) {
       header { flex-direction: column; align-items: flex-start; gap: 8px; }
-      .qa-top { flex-direction: column; }
+      .qa-top, .grid-2 { flex-direction: column; display: block; }
     }
   </style>
 </head>
@@ -54,7 +58,7 @@
       <input type="file" id="importar" hidden accept=".json" />
       <button class="sec" onclick="document.getElementById('importar').click()">Importar JSON</button>
       <div id="statusCadastro" class="status">Sistema pronto.</div>
-      <div class="muted" style="margin-top:8px;">Agora a LM pode responder automaticamente e também gravar pergunta e resposta por comando de voz.</div>
+      <div class="muted" style="margin-top:8px;">Agora a LM entende perguntas parecidas melhor, usa sinônimos e pode sugerir a resposta mais próxima quando a semelhança não for exata.</div>
     </div>
 
     <div class="card">
@@ -73,16 +77,23 @@
       <div class="muted" style="margin-top:8px;">Resposta automática: ao terminar de digitar ou ditar no teclado, a LM responde sozinha. Pela escuta automática, você pode dizer GRAVAR, falar a pergunta e depois a resposta.</div>
     </div>
 
-    <div class="card">
-      <h3>Resposta</h3>
-      <div id="respostaLM" class="resposta-box">Aguardando pergunta...</div>
-      <button onclick="ouvirResposta()">🔊 Ouvir resposta</button>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Resposta</h3>
+        <div id="respostaLM" class="resposta-box">Aguardando pergunta...</div>
+        <button onclick="ouvirResposta()">🔊 Ouvir resposta</button>
+      </div>
+
+      <div class="card">
+        <h3>Análise da pergunta</h3>
+        <div id="analiseLM" class="score-box">Nenhuma análise ainda.</div>
+      </div>
     </div>
   </div>
 </main>
 
 <script>
-  const STORAGE_KEY = 'lm_perguntas_respostas_v3';
+  const STORAGE_KEY = 'lm_perguntas_respostas_v4';
   let base = [];
   let editandoIndex = -1;
   let recognition = null;
@@ -90,6 +101,30 @@
   let etapaGravacao = 'esperando';
   let perguntaTemporaria = '';
   let ouvindoContinuamente = false;
+
+  const STOP_WORDS = [
+    'o','a','os','as','um','uma','uns','umas','de','da','do','das','dos','e','é','em','no','na','nos','nas',
+    'por','para','pra','que','qual','quais','como','com','sem','ao','aos','à','às','eu','você','vc','me','se',
+    'esta','está','estao','estão','tem','tenho','ser','são','foi','era','onde','quando'
+  ];
+
+  const SINONIMOS = {
+    material: ['material','materia','matéria','composicao','composição'],
+    peca: ['peca','peça','produto','item','componente'],
+    prazo: ['prazo','tempo','entrega','previsao','previsão'],
+    maquina: ['maquina','máquina','equipamento','prensa','cnc'],
+    produzir: ['produzindo','producao','produção','fabricando','rodando','operando','trabalhando'],
+    estoque: ['estoque','saldo','quantidade','disponivel','disponível'],
+    materia_prima: ['materia_prima','matéria-prima','materia','matéria','insumo','insumos'],
+    textil: ['textil','têxtil','tecido','tecidos'],
+    hoje: ['hoje','agora','momento','atualmente'],
+    situacao: ['situacao','situação','status','estado','condicao','condição'],
+    pedido: ['pedido','ordem','ordens','os','op','ops'],
+    atrasado: ['atrasado','atrasada','pendente','vencido','vencida'],
+    nome: ['nome','identificacao','identificação'],
+    cliente: ['cliente','comprador'],
+    setor: ['setor','area','área','departamento']
+  };
 
   function carregarBase() {
     try {
@@ -215,6 +250,13 @@
     if (ok) definirStatus('Registro excluído com sucesso.');
   }
 
+  function substituirSinonimo(palavra) {
+    for (const chave in SINONIMOS) {
+      if (SINONIMOS[chave].includes(palavra)) return chave;
+    }
+    return palavra;
+  }
+
   function normalizar(texto) {
     return String(texto || '')
       .toLowerCase()
@@ -225,34 +267,75 @@
       .trim();
   }
 
-  function pontuacao(textoUsuario, textoBase) {
-    const a = normalizar(textoUsuario);
-    const b = normalizar(textoBase);
-    if (!a || !b) return 0;
-    if (a === b) return 100;
-    if (a.includes(b) || b.includes(a)) return 90;
-
-    const pa = a.split(' ');
-    const pb = b.split(' ');
-    let iguais = 0;
-    pa.forEach(p => { if (pb.includes(p)) iguais++; });
-    return Math.round((iguais / Math.max(pa.length, pb.length, 1)) * 100);
+  function tokenizar(texto) {
+    return normalizar(texto)
+      .split(' ')
+      .filter(Boolean)
+      .filter(p => !STOP_WORDS.includes(p))
+      .map(substituirSinonimo);
   }
 
-  function buscarMelhorResposta(texto) {
-    let melhor = null;
-    let melhorScore = 0;
+  function gerarChaves(texto) {
+    const tokens = tokenizar(texto);
+    const unicos = [...new Set(tokens)];
+    return unicos;
+  }
 
-    base.forEach(item => {
-      const score = pontuacao(texto, item.pergunta);
-      if (score > melhorScore) {
-        melhorScore = score;
-        melhor = item;
-      }
-    });
+  function pontuacao(textoUsuario, textoBase) {
+    const tokensUsuario = gerarChaves(textoUsuario);
+    const tokensBase = gerarChaves(textoBase);
 
-    if (melhor && melhorScore >= 40) return melhor;
-    return null;
+    if (!tokensUsuario.length || !tokensBase.length) return 0;
+
+    const setBase = new Set(tokensBase);
+    const comuns = tokensUsuario.filter(t => setBase.has(t)).length;
+    const scoreTokens = Math.round((comuns / Math.max(tokensUsuario.length, tokensBase.length, 1)) * 100);
+
+    const normalUsuario = normalizar(textoUsuario);
+    const normalBase = normalizar(textoBase);
+
+    let bonus = 0;
+    if (normalUsuario === normalBase) bonus += 35;
+    else if (normalUsuario.includes(normalBase) || normalBase.includes(normalUsuario)) bonus += 20;
+
+    const scoreFinal = Math.min(scoreTokens + bonus, 100);
+    return scoreFinal;
+  }
+
+  function buscarMelhoresRespostas(texto) {
+    const resultados = base.map(item => ({
+      item,
+      score: pontuacao(texto, item.pergunta),
+      chaves: gerarChaves(item.pergunta)
+    })).sort((a, b) => b.score - a.score);
+
+    return resultados;
+  }
+
+  function atualizarAnalise(textoPergunta, melhor, segunda) {
+    const analise = document.getElementById('analiseLM');
+    const chavesUsuario = gerarChaves(textoPergunta);
+
+    if (!melhor) {
+      analise.innerHTML = `
+        <div><strong>Pergunta entendida:</strong> ${escapeHtml(textoPergunta)}</div>
+        <div style="margin-top:8px;"><strong>Palavras-chave:</strong> ${chavesUsuario.map(c => `<span class="pill">${escapeHtml(c)}</span>`).join(' ') || 'nenhuma'}</div>
+        <div style="margin-top:8px;"><strong>Resultado:</strong> nenhuma pergunta próxima encontrada.</div>
+      `;
+      return;
+    }
+
+    let nivel = 'baixa';
+    if (melhor.score >= 85) nivel = 'alta';
+    else if (melhor.score >= 60) nivel = 'média';
+
+    analise.innerHTML = `
+      <div><strong>Pergunta entendida:</strong> ${escapeHtml(textoPergunta)}</div>
+      <div style="margin-top:8px;"><strong>Palavras-chave:</strong> ${chavesUsuario.map(c => `<span class="pill">${escapeHtml(c)}</span>`).join(' ') || 'nenhuma'}</div>
+      <div style="margin-top:8px;"><strong>Melhor correspondência:</strong> ${escapeHtml(melhor.item.pergunta)}</div>
+      <div style="margin-top:8px;"><strong>Similaridade:</strong> ${melhor.score}% (${nivel})</div>
+      ${segunda ? `<div style="margin-top:8px;"><strong>Segunda opção:</strong> ${escapeHtml(segunda.item.pergunta)} - ${segunda.score}%</div>` : ''}
+    `;
   }
 
   function perguntarLM() {
@@ -267,19 +350,32 @@
 
     if (!texto) {
       respostaEl.innerText = 'Digite ou fale uma pergunta.';
+      atualizarAnalise('', null, null);
       return;
     }
 
-    const melhor = buscarMelhorResposta(texto);
+    const resultados = buscarMelhoresRespostas(texto);
+    const melhor = resultados[0] || null;
+    const segunda = resultados[1] || null;
 
-    if (melhor) {
-      respostaEl.innerText = melhor.resposta;
-      ouvirTexto(melhor.resposta);
-    } else {
-      const msg = 'Não encontrei resposta para esta pergunta.';
+    atualizarAnalise(texto, melhor, segunda);
+
+    if (melhor && melhor.score >= 70) {
+      respostaEl.innerText = melhor.item.resposta;
+      ouvirTexto(melhor.item.resposta);
+      return;
+    }
+
+    if (melhor && melhor.score >= 45) {
+      const msg = `Acho que você quis dizer: ${melhor.item.pergunta}. ${melhor.item.resposta}`;
       respostaEl.innerText = msg;
       ouvirTexto(msg);
+      return;
     }
+
+    const msg = 'Não encontrei uma resposta confiável para esta pergunta.';
+    respostaEl.innerText = msg;
+    ouvirTexto(msg);
   }
 
   function ouvirResposta() {
